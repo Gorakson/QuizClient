@@ -1,0 +1,7 @@
+package edu.hm.cs.game.client;
+
+public enum LogType {
+    Message,
+    Protocol,
+    Question
+}

@@ -1,0 +1,110 @@
+/**
+ * Hochschule München, Fakultät 07. 
+ * Softwareentwicklung II Praktikum, IF2A, SS2016
+ * Lösung der 2. Aufgabe
+ * Oracle Java SE 8u77
+ * OS Win7 64, RAM 8GB, CPU 4x2.5GHz x64
+ */
+
+package edu.hm.cs.game.client;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.net.Socket;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+/**
+ * Connection to a server.
+ * @author Thomas Pfaffinger, thomas.pfaffinger@hm.edu
+ * @version 1.0
+ *
+ */
+public class ServerConnection implements Runnable {
+    /** Indicates that a received/transmitted text is a protocol. */
+    private static final String PROTOCOL_IDENTIFIER = "Protocol";
+    /** Indicates that a received/transmitted text is an answer. */
+    private static final String ANSWER_IDENTIFIER = "Answer:";
+    /** Indicates that a received/transmitted text is a question. */
+    private static final String QUESTION_IDENTIFIER = "Question:";
+    /** Indicates that a received/transmitted text should end the game. */
+    private static final String GAME_OVER_IDENTIFIER = "GameOver:";
+    /** Flag: true if the game is over, false otherwise. */
+    private final AtomicBoolean isGameOver;
+    /** Server socket. */
+    private final Socket server;
+    /** Accepts text received by the server. */
+    private final TextLog log;
+    /** Writes messages to the server. */
+    private final PrintWriter writer;
+    /** Reads messages from the server. */
+    private final BufferedReader reader;
+    
+    /**
+     * Ctor.
+     * @param socket the server
+     * @param log textlog, that accepts text and loggs it.
+     * @throws IOException 
+     */
+    public ServerConnection(Socket socket, TextLog log) throws IOException {       
+        this.server = socket;
+        this.log = log;
+        isGameOver = new AtomicBoolean(false);
+        reader = new BufferedReader(new InputStreamReader(server.getInputStream()));
+        writer = new PrintWriter(server.getOutputStream(), true);
+    }
+    
+    @Override
+    public void run() {
+        String line;
+        try {
+            line = reader.readLine();
+            while (!isGameOver() && line != null && server.isConnected()) {
+                handleInput(line);
+                line = reader.readLine();
+            }
+            writer.close();
+            reader.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+    
+    /**
+     * Sends the players answer to a question to the server.
+     * @param answer the answer to send.
+     */
+    public void postAnswer(String answer) {
+        writer.println(ANSWER_IDENTIFIER+answer);
+    }
+    
+    /**
+     * True if the game is over, false otherwise.
+     * @return True if the game is over, false otherwise
+     */
+    public boolean isGameOver() {
+        return isGameOver.get();
+    }
+    
+    /**
+     * Executes some action depending on the input.
+     * @param line a text received from the server.
+     */
+    private void handleInput(String line) {
+        if (line == null) {
+            throw new NullPointerException();
+        }
+        
+        if (line.startsWith(QUESTION_IDENTIFIER)) {
+            log.log(LogType.Question, line.replace(QUESTION_IDENTIFIER, ""));
+        } else if (line.startsWith(GAME_OVER_IDENTIFIER)) {
+            isGameOver.set(true);
+            log.log(LogType.Protocol, line.replace(GAME_OVER_IDENTIFIER, ""));
+        } else if (line.startsWith(PROTOCOL_IDENTIFIER)) {
+            log.log(LogType.Protocol, line.replace(PROTOCOL_IDENTIFIER, ""));
+        } else {
+            throw new IllegalArgumentException();
+        }
+    }
+}

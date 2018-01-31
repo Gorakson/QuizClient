@@ -1,0 +1,5 @@
+package edu.hm.cs.game.client;
+
+public interface TextLog {
+    void log(LogType type, String text);
+}

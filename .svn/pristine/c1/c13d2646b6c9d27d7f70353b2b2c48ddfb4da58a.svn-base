@@ -1,0 +1,178 @@
+package edu.hm.cs.game.client;
+
+import java.awt.BorderLayout;
+import java.awt.EventQueue;
+import java.awt.GridLayout;
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.Socket;
+import java.net.UnknownHostException;
+
+import javax.swing.JButton;
+import javax.swing.JEditorPane;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.border.EmptyBorder;
+import javax.swing.text.BadLocationException;
+import javax.swing.text.Document;
+
+/**
+ * Client application for question game.
+ */
+@SuppressWarnings("serial")
+public class QuizClient extends JFrame implements Runnable, TextLog {
+
+    /** first label for any message to the client. */
+    private JLabel messageLabel;
+    /** second label for any message to the client. */
+    private JLabel protocolLabel;
+    /** panel to show current question. */
+    private JEditorPane questionPanel;
+    /** panel to show current state of the game. */
+    private JEditorPane protocolPanel;
+    /** button to send a yes answer. */
+    private JButton yesButton;
+    /** button to send a no answer. */
+    private JButton noButton;
+    
+    /**
+     * Initialize the frame.
+     */
+    public QuizClient() {
+        initGui();
+        new Thread(this).start();
+    }
+
+    /**
+     * Initialize frame.
+     */
+    public void initGui() {
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setBounds(100, 100, 800, 300);
+        JPanel contentPane = new JPanel();
+        contentPane.setBorder(new EmptyBorder(5, 5, 5, 5));
+        setContentPane(contentPane);
+        contentPane.setLayout(new GridLayout(0, 2, 0, 0));
+        contentPane.add(initLeftPanel());
+        contentPane.add(initRightPanel());
+        messageLabel.setText("message");
+        protocolLabel.setText("protocol");
+        questionPanel.setText("question");
+    }
+
+    /**
+     * Create left panel.
+     * 
+     * @return left panel with elements
+     */
+    public JPanel initLeftPanel() {
+        JPanel leftPanel = new JPanel();
+
+        leftPanel.setLayout(new BorderLayout(0, 0));
+
+        JPanel buttonPanel = new JPanel();
+        leftPanel.add(buttonPanel, BorderLayout.SOUTH);
+        buttonPanel.setLayout(new GridLayout(0, 2, 0, 0));
+
+        yesButton = new JButton("Ja");
+        buttonPanel.add(yesButton);
+        
+        noButton = new JButton("Nein");
+        buttonPanel.add(noButton);
+
+        JPanel messagePanel = new JPanel();
+        leftPanel.add(messagePanel, BorderLayout.NORTH);
+
+        messageLabel = new JLabel();
+        messagePanel.add(messageLabel);
+
+        JScrollPane scrollPane1 = new JScrollPane();
+        leftPanel.add(scrollPane1, BorderLayout.CENTER);
+
+        questionPanel = new JEditorPane();
+        questionPanel.setEditable(false);
+        scrollPane1.setViewportView(questionPanel);
+        return leftPanel;
+    }
+
+    /**
+     * Create right panel.
+     * 
+     * @return right panel with elements
+     */
+    public JPanel initRightPanel() {
+        JPanel rightPanel = new JPanel();
+        rightPanel.setLayout(new BorderLayout(0, 0));
+
+        JScrollPane scrollPane = new JScrollPane();
+        rightPanel.add(scrollPane, BorderLayout.CENTER);
+
+        protocolPanel = new JEditorPane();
+        protocolPanel.setEditable(false);
+        scrollPane.setViewportView(protocolPanel);
+
+        JPanel messagePanel2 = new JPanel();
+        rightPanel.add(messagePanel2, BorderLayout.NORTH);
+
+        protocolLabel = new JLabel();
+        messagePanel2.add(protocolLabel);
+        return rightPanel;
+    }
+
+    @Override
+    public void run() {
+
+        try {
+            final InetAddress host = InetAddress.getByName(null);
+            final int port = 1337;
+            
+            try (final Socket socket = new Socket(host, port)) {
+                final ServerConnection serverConnection = new ServerConnection(socket, this);
+                new Thread(serverConnection).start();
+                
+                synchronized (serverConnection) {
+                    while (!serverConnection.isGameOver()) {
+                        serverConnection.wait();
+                    }
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            } catch (InterruptedException e) {
+                throw new AssertionError();
+            }
+            
+        } catch (UnknownHostException e) {
+            e.printStackTrace();
+        }
+    }
+    
+
+    @Override
+    public void log(LogType type, String text) {
+        try {
+            Document doc = protocolPanel.getDocument();
+            protocolPanel.setText(doc.getText(0, doc.getLength()) + text + System.lineSeparator());
+        } 
+        catch (BadLocationException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Launch the application.
+     * 
+     * @param args
+     *            values to start application
+     */
+    public static void main(String[] args) {
+        EventQueue.invokeLater(new Runnable() {
+            public void run() {
+                QuizClient frame = new QuizClient();
+                frame.setVisible(true);
+            }
+        });
+    }
+}
+
